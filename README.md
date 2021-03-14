@@ -1,5 +1,5 @@
-Laravel Shopping Cart
-=====================
+`Laravel Shopping Cart
+`=====================
 
 [![GitHub Workflow Status](https://github.com/melihovv/laravel-shopping-cart/workflows/Run%20tests/badge.svg)](https://github.com/melihovv/laravel-shopping-cart/actions)
 [![styleci](https://styleci.io/repos/95455977/shield)](https://styleci.io/repos/95455977)

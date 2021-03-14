@@ -45,6 +45,45 @@ class ShoppingCart
     private $coupons;
 
     /**
+     * Shipping.
+     *
+     * @var float
+     */
+    private $shipping;
+
+    /**
+     * Additional Shipping Tax.
+     *
+     * @var float
+     */
+    private $shipping_tax;
+
+    /**
+     * Additional Shipping.
+     *
+     * @var float
+     */
+    private $additional_shipping;
+
+    /**
+     * Shipping Tax.
+     *
+     * @var float
+     */
+    private $additional_shipping_tax;
+
+
+    /**
+     * Shipping method.
+     *
+     * @var string
+     */
+    private $shipping_method;
+
+
+    private $signature;
+
+    /**
      * ShoppingCart constructor.
      *
      * @param ShoppingCartRepositoryInterface $repo
@@ -85,6 +124,21 @@ class ShoppingCart
         return $cartItem;
     }
 
+    public function update($id, $name, $price, $quantity, $options = [])
+    {
+
+        $cartItem = new CartItem($id, $name, $price, $quantity, $options);
+
+        $uniqueId = $cartItem->getUniqueId();
+        if ($this->content->has($uniqueId)) {
+            $cartItem->quantity = $quantity;
+        }
+        $this->content->where('id','=',13)->first();
+        $this->content->put($uniqueId, $cartItem);
+
+        return $cartItem;
+    }
+
     /**
      * Remove the item with the specified unique id from shopping cart.
      *
@@ -92,9 +146,15 @@ class ShoppingCart
      *
      * @return bool
      */
-    public function remove($uniqueId)
+    public function remove($id)
     {
-        if ($cartItem = $this->get($uniqueId)) {
+        $cartItem = $this->content->where('id','=',$id)->first();
+
+        if(!$cartItem){
+            return false;
+        }
+        $uniqueId = $cartItem->getUniqueId();
+        if ($cartItem = $this->get($id)) {
             $this->content->pull($cartItem->getUniqueId());
 
             return true;
@@ -118,13 +178,54 @@ class ShoppingCart
     /**
      * Get the item with the specified unique id from shopping cart.
      *
-     * @param string|int $uniqueId
+     * @param string|int $id
      *
      * @return CartItem|null
      */
-    public function get($uniqueId)
+    public function get($id)
     {
-        return $this->content->get($uniqueId);
+        $cartItem = $this->content->where('id','=',$id)->first();
+        if(!$cartItem){
+            return null;
+        }
+        return $cartItem;
+    }
+
+
+    public function getShipping(){
+       return $this->shipping;
+    }
+
+    public function getShippingTax(){
+       return $this->shipping_tax;
+    }
+
+
+
+    public function setShipping($cost,$method){
+        $this->shipping_method = $method;
+        if($cost > 0) {
+            $this->shipping = $cost;
+            $this->shipping_tax = $cost - ($cost / 1.21);
+        }else{
+            $this->shipping = 0;
+            $this->shipping_tax = 0;
+        }
+    }
+
+    public function setAdditionalShipping($cost){
+
+        if($cost > 0) {
+            $this->additional_shipping = $cost;
+            $this->additional_shipping_tax = $cost - ($cost / 1.21);
+        }else{
+            $this->additional_shipping = 0;
+            $this->additional_shipping_tax = 0;
+        }
+    }
+
+    public function getAdditionalShipping(){
+        return $this->additional_shipping;
     }
 
     /**
@@ -177,6 +278,31 @@ class ShoppingCart
     }
 
     /**
+     * Get the number of item in the shopping cart.
+     *
+     * @return int
+     */
+    public function countTotalItems()
+    {
+        return $this->content->sum(function (CartItem $cartItem) {
+            return $cartItem->getQuantity();
+        });
+    }
+
+
+    /**
+     * Get subtotal price without coupons.
+     *
+     * @return float
+     */
+    public function getSubTotal()
+    {
+        return $this->content->sum(function (CartItem $cartItem) {
+            return $cartItem->getTotal();
+        });
+    }
+
+    /**
      * Get total price without coupons.
      *
      * @return float
@@ -184,8 +310,28 @@ class ShoppingCart
     public function getTotal()
     {
         return $this->content->sum(function (CartItem $cartItem) {
-            return $cartItem->getTotal();
+            return $cartItem->getTotal() + $this->shipping + $this->additional_shipping;
         });
+    }
+
+    /**
+     * Get total tax with coupons.
+     *
+     * @return float
+     */
+    public function getTax()
+    {
+        return $this->content->sum(function (CartItem $cartItem) {
+            return $cartItem->getTax() + $this->shipping_tax + $this->additional_shipping_tax;
+        });
+    }
+
+
+    public function getTotalShipping(){
+
+
+        return $this->shipping + $this->additional_shipping;
+
     }
 
     /**
@@ -256,6 +402,24 @@ class ShoppingCart
     }
 
     /**
+     * @return mixed
+     */
+    public function getSignature()
+    {
+        return $this->signature;
+    }
+
+    /**
+     * @param mixed $signature
+     */
+    public function setSignature($signature): void
+    {
+        $this->signature = $signature;
+    }
+
+
+
+    /**
      * Store the current instance of the cart.
      *
      * @param $id
@@ -270,6 +434,12 @@ class ShoppingCart
             json_encode(serialize([
                 'content' => $this->content,
                 'coupons' => $this->coupons,
+                'shipping' => $this->shipping,
+                'shipping_tax' => $this->shipping_tax,
+                'additional_shipping' => $this->additional_shipping,
+                'additional_shipping_tax' => $this->additional_shipping_tax,
+                'shipping_method' => $this->shipping_method,
+                'signature' => $this->signature
             ]))
         );
 
@@ -294,7 +464,12 @@ class ShoppingCart
         $unserialized = unserialize(json_decode($cart->content));
         $this->content = $unserialized['content'];
         $this->coupons = $unserialized['coupons'];
-
+        $this->shipping = $unserialized['shipping'] ?? 0;
+        $this->shipping_tax = $unserialized['shipping_tax'] ?? 0;
+        $this->additional_shipping = $unserialized['additional_shipping'] ?? 0;
+        $this->additional_shipping_tax = $unserialized['additional_shipping_tax'] ?? 0;
+        $this->shipping_method = $unserialized['shipping_method'] ?? 0;
+        $this->signature = $unserialized['signature'] ?? false;
         $this->instance($cart->instance);
 
         return $this;
@@ -309,4 +484,22 @@ class ShoppingCart
     {
         $this->repo->remove($id, $this->instanceName);
     }
+
+    /**
+     * @return string
+     */
+    public function getShippingMethod(): string
+    {
+        return $this->shipping_method;
+    }
+
+    /**
+     * @param string $shipping_method
+     */
+    public function setShippingMethod(string $shipping_method): void
+    {
+        $this->shipping_method = $shipping_method;
+    }
+
+
 }

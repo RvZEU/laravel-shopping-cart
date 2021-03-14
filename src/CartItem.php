@@ -40,6 +40,13 @@ class CartItem implements Arrayable
     public $price;
 
     /**
+     * The tax of the cart item.
+     *
+     * @var float
+     */
+    public $tax;
+
+    /**
      * The quantity for this cart item.
      *
      * @var int|float
@@ -53,6 +60,8 @@ class CartItem implements Arrayable
      */
     public $options;
 
+    public $product;
+
     /**
      * CartItem constructor.
      *
@@ -64,7 +73,7 @@ class CartItem implements Arrayable
      *
      * @throws InvalidArgumentException
      */
-    public function __construct($id, $name, $price, $quantity, array $options = [])
+    public function __construct($id, $name, $price, $quantity, $productModel, array $options = [])
     {
         if (empty($id)) {
             throw new InvalidArgumentException('Please supply a valid identifier.');
@@ -82,12 +91,18 @@ class CartItem implements Arrayable
             throw new InvalidArgumentException('Please supply a valid quantity.');
         }
 
+        if (empty($productModel)) {
+            throw new InvalidArgumentException('Please supply a valid Product.');
+        }
+
+
         $this->id = $id;
         $this->name = $name;
         $this->price = (float) $price;
         $this->quantity = (int) $quantity;
         $this->options = $options;
         $this->uniqueId = $this->generateUniqueId();
+        $this->product = $productModel;
     }
 
     /**
@@ -106,7 +121,8 @@ class CartItem implements Arrayable
             $attributes['name'],
             $attributes['price'],
             $attributes['quantity'],
-            Arr::get($attributes, 'options', [])
+            Arr::get($attributes, 'options', []),
+            $attributes['product']
         );
     }
 
@@ -145,6 +161,30 @@ class CartItem implements Arrayable
     }
 
     /**
+     * Get total tax.
+     *
+     * Total tax = total - (total / tax)
+     *
+     * @return float
+     */
+
+    public function getTax(){
+
+        return  $this->getTotal()  - ($this->getTotal() / 1.21);
+
+    }
+
+    /**
+     * @return float|int
+     */
+    public function getQuantity()
+    {
+        return $this->quantity;
+    }
+
+
+
+    /**
      * Get the instance as an array.
      *
      * @return array
@@ -156,8 +196,10 @@ class CartItem implements Arrayable
             'id' => $this->id,
             'name' => $this->name,
             'price' => $this->price,
+            'tax'   => $this->tax,
             'quantity' => $this->quantity,
             'options' => $this->options,
+            'product' => $this->product
         ];
     }
 }
